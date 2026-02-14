@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nexus Mini App</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://unpkg.com/@tonconnect/sdk@latest/dist/tonconnect-sdk.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.2/firebase-app.js"></script> <!-- Firebase App -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.2/firebase-database.js"></script> <!-- Firebase Realtime DB -->
+    <style>
+        body {
+            background: black;
+            color: white;
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+        #header {
+            padding: 10px;
+            background: #1a1a1a;
+        }
+        #stats {
+            display: flex;
+            justify-content: space-around;
+            margin: 10px 0;
+            font-size: 14px;
+        }
+        #mine-area {
+            margin: 20px 0;
+            position: relative;
+        }
+        .circle {
+            width: 220px;
+            height: 220px;
+            background: #ffd700; /* Gold yellow */
+            border-radius: 50%;
+            margin: auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+        .circle:active {
+            transform: scale(0.95); /* Tap animation */
+        }
+        .logo-img {
+            width: 150px;
+            height: 150px;
+            border-radius: 50%; /* Round if needed */
+        }
+        #energy {
+            margin: 10px 0;
+        }
+        #energy-bar {
+            background: #333;
+            height: 20px;
+            width: 80%;
+            max-width: 300px;
+            margin: auto;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        #energy-fill {
+            background: #ffd700;
+            height: 100%;
+            transition: width 0.3s;
+        }
+        #tabs {
+            display: flex;
+            justify-content: space-around;
+            position: fixed;
+            bottom: 0;
+            width: 100%;
+            background: #1a1a1a;
+            padding: 10px 0;
+            border-top: 1px solid #444;
+        }
+        .tab-btn {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        .tab-content {
+            display: none;
+            margin: 20px 0 60px 0;
+            padding: 10px;
+        }
+        .active {
+            display: block;
+        }
+        ul {
+            list-style: none;
+            padding: 0;
+        }
+        li {
+            margin: 10px 0;
+            background: #222;
+            padding: 10px;
+            border-radius: 8px;
+        }
+        button {
+            background: #ffd700;
+            color: black;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        a {
+            color: #ffd700;
+        }
+        #referral-section {
+            margin-top: 20px;
+        }
+        #referral-link {
+            word-break: break-all;
+        }
+    </style>
+</head>
+<body>
+    <div id="header">
+        <div id="league">Beginner</div>
+        <div id="balance">0 nexoshi</div>
+    </div>
+    <div id="stats">
+        <div>Profit/Hour: <span id="profit-hour">+1000</span></div>
+        <div>Per Tap: <span id="per-tap">1</span></div>
+        <div>Multiplier: <span id="multiplier">2x</span></div>
+    </div>
+    <div id="mine-area" onclick="mine()">
+        <div class="circle">
+            <img src="https://i.imgur.com/c1kFmHd.png" alt="Nexus Coin" class="logo-img">
+        </div>
+        <p>Tap to mine nexoshi!</p>
+    </div>
+    <div id="energy">
+        Energy: <div id="energy-bar"><div id="energy-fill" style="width: 100%;"></div></div> <!-- Start full -->
+        <span id="energy-text">1000/1000</span>
+        <p id="recharge-text">Full recharge in ~3h</p>
+    </div>
+
+    <div id="tabs">
+        <button class="tab-btn" onclick="showTab('shop')">Shop</button>
+        <button class="tab-btn" onclick="showTab('tasks')">Tasks</button>
+        <button class="tab-btn" onclick="showTab('boosts')">Boosts</button>
+    </div>
+
+    <div id="shop" class="tab-content">
+        <h2>Buy Tickets (with TON)</h2>
+        <ul id="tickets-list">
+            <!-- Dynamic tickets list -->
+        </ul>
+    </div>
+
+    <div id="tasks" class="tab-content">
+        <h2>Tasks</h2>
+        <ul>
+            <li>Join Channel: <a href="https://t.me/Nexus_Planet" target="_blank">https://t.me/Nexus_Planet</a> <button onclick="completeTask('channel', 5000)">Complete (+5000 nexoshi)</button></li>
+            <li>Join Chat: <a href="https://t.me/Nexus_Planet_Chat" target="_blank">https://t.me/Nexus_Planet_Chat</a> <button onclick="completeTask('chat', 5000)">Complete (+5000)</button></li>
+            <li>Follow Twitter: <a href="https://twitter.com/Cyrus_Nexus" target="_blank">@Cyrus_Nexus</a> <button onclick="completeTask('twitter', 5000)">Complete (+5000)</button></li>
+            <li>Daily Login: <button onclick="claimDaily()">Claim (+1000 to +5000 based on streak)</button> <span id="streak">Streak: 0</span></li>
+            <li>Connect Wallet: <button onclick="connectWallet()">Connect TON Keeper (+2000)</button></li>
+            <li>Deposit 1 TON: <button onclick="depositOneTON()">Complete (+5000)</button></li>
+        </ul>
+        <div id="referral-section">
+            <h3>Referrals</h3>
+            <p>Invite friends and earn nexoshi!</p>
+            <p id="referral-link"></p>
+            <p>Current Referrals: <span id="referral-count">0</span></p>
+            <p>Total Referral Earnings: <span id="referral-earnings">0</span></p>
+        </div>
+    </div>
+
+    <div id="boosts" class="tab-content">
+        <h2>Boosts</h2>
+        <ul>
+            <li>Super Mine (Temporary +50% speed): Cost 10000 nexoshi <button onclick="applyBoost('super', 10000, () => { setTimeout(resetBoost, 3600000); })">Buy</button></li>
+            <li>Auto Miner (Auto tap every 5s): Cost 20000 nexoshi <button onclick="applyBoost('auto', 20000, startAutoMine)">Buy</button></li>
+            <li>Tap Multiplier (+1x permanent): Cost 15000 nexoshi <button onclick="applyBoost('multiplier', 15000, () => multiplier += 1)">Buy</button></li>
+            <li>Recharge Time (Faster recharge +1 per min): Cost 12000 nexoshi <button onclick="applyBoost('recharge', 12000, () => rechargeRate += 1)">Buy</button></li>
+            <li>Capacity (+500 max energy): Cost 18000 nexoshi <button onclick="applyBoost('capacity', 18000, () => maxEnergy += 500)">Buy</button></li>
+        </ul>
+    </div>
+
+    <script>
+        // Firebase config – Replace with your own from Firebase Console
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "your-project.firebaseapp.com",
+            databaseURL: "https://your-project-default-rtdb.firebaseio.com",
+            projectId: "your-project",
+            storageBucket: "your-project.appspot.com",
+            messagingSenderId: "YOUR_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+        const app = firebase.initializeApp(firebaseConfig);
+        const db = firebase.database(app);
+
+        // Main variables
+        let userId = null;
+        let balance = 0;
+        let energy = 1000;
+        let maxEnergy = 1000;
+        let perTap = 1;
+        let multiplier = 2;
+        let profitHour = 1000;
+        let league = 'Beginner';
+        let rechargeRate = 1;
+        let wallet = 'UQDGdS6hW27b98YGvxyaljwZUHX-UA4w6MwbaFFUHMBhhk48';
+        let boughtTickets = {};
+        let completedTasks = {};
+        let dailyStreak = 0;
+        let lastLogin = 0;
+        let referrals = [];
+        let referralEarnings = 0;
+        let autoMineInterval = null;
+        let tonConnector = null;
+
+        const tickets = [
+            {name: 'Bronze', price: 1, boost: 1.5, desc: '1.5x boost + Leaderboard name'},
+            {name: 'Silver', price: 5, boost: 2, desc: '2x boost + 20% less fees in transactions'},
+            {name: 'Gold', price: 10, boost: 3, desc: '3x boost + Early access to beta metaverse'},
+            {name: 'Platinum', price: 20, boost: 4, desc: '4x boost + Custom avatar in metaverse'},
+            {name: 'Diamond', price: 30, boost: 5, desc: '5x boost + Priority in claiming real house'},
+            {name: 'Emerald', price: 40, boost: 6, desc: '6x boost + VIP role in Discord/Telegram'},
+            {name: 'Ruby', price: 50, boost: 7, desc: '7x boost + Commission from referrals'}
+        ];
+
+        // Update UI
+        function updateUI() {
+            document.getElementById('balance').innerText = balance.toLocaleString() + ' nexoshi';
+            document.getElementById('league').innerText = league;
+            document.getElementById('per-tap').innerText = perTap;
+            document.getElementById('multiplier').innerText = multiplier.toFixed(1) + 'x';
+            document.getElementById('profit-hour').innerText = '+' + profitHour.toLocaleString();
+            document.getElementById('energy-text').innerText = energy + '/' + maxEnergy;
+            document.getElementById('energy-fill').style.width = (energy / maxEnergy * 100) + '%';
+            document.getElementById('streak').innerText = 'Streak: ' + dailyStreak;
+            document.getElementById('referral-count').innerText = referrals.length;
+            document.getElementById('referral-earnings').innerText = referralEarnings.toLocaleString() + ' nexoshi';
+        }
+
+        // Init user data from Firebase
+        async function initUserData() {
+            const tg = Telegram.WebApp;
+            userId = tg.initDataUnsafe.user ? tg.initDataUnsafe.user.id : 'guest_' + Math.random().toString(36).slice(2);
+            const userRef = db.ref('users/' + userId);
+            const snapshot = await userRef.once('value');
+            const data = snapshot.val();
+            if (data) {
+                balance = data.balance || 0;
+                energy = data.energy || 1000;
+                maxEnergy = data.maxEnergy || 1000;
+                perTap = data.perTap || 1;
+                multiplier = data.multiplier || 2;
+                profitHour = data.profitHour || 1000;
+                league = data.league || 'Beginner';
+                rechargeRate = data.rechargeRate || 1;
+                boughtTickets = data.boughtTickets || {};
+                completedTasks = data.completedTasks || {};
+                dailyStreak = data.dailyStreak || 0;
+                lastLogin = data.lastLogin || 0;
+                referrals = data.referrals || [];
+                referralEarnings = data.referralEarnings || 0;
+            } else {
+                saveUserData(); // Initial save
+            }
+            updateUI();
+            loadTickets();
+            initReferral();
+            claimDaily();
+            calculateOfflineGain();
+        }
+
+        // Save data
+        function saveUserData() {
+            if (!userId) return;
+            db.ref('users/' + userId).set({
+                balance, energy, maxEnergy, perTap, multiplier, profitHour, league, rechargeRate,
+                boughtTickets, completedTasks, dailyStreak, lastLogin, referrals, referralEarnings,
+                lastExit: Date.now()
+            });
+        }
+
+        // Mining
+        function mine() {
+            if (energy > 0) {
+                let gain = perTap * multiplier;
+                balance += gain;
+                energy -= 1;
+                profitHour = Math.floor(balance / 1000) * 100;
+                checkLeague();
+                updateUI();
+                saveUserData();
+            } else {
+                alert('Energy is empty! Wait for recharge.');
+            }
+        }
+
+        // Check league
+        function checkLeague() {
+            let newLeague = league;
+            let reward = 0;
+            if (balance < 100000) newLeague = 'Beginner';
+            else if (balance < 500000 && league !== 'Bronze') { newLeague = 'Bronze'; reward = 10000; }
+            else if (balance < 1000000 && league !== 'Silver') { newLeague = 'Silver'; reward = 50000; }
+            else if (balance < 5000000 && league !== 'Gold') { newLeague = 'Gold'; reward = 100000; }
+            else if (balance < 10000000 && league !== 'Platinum') { newLeague = 'Platinum'; reward = 200000; }
+            else if (balance < 50000000 && league !== 'Diamond') { newLeague = 'Diamond'; reward = 500000; }
+            else if (league !== 'Legendary') { newLeague = 'Legendary'; reward = 1000000; }
+
+            if (newLeague !== league) {
+                league = newLeague;
+                balance += reward;
+                alert(`Congratulations! You reached ${league} league. Reward: ${reward} nexoshi`);
+                updateUI();
+                saveUserData();
+            }
+        }
+
+        // Energy recharge
+        setInterval(() => {
+            if (energy < maxEnergy) {
+                energy += rechargeRate;
+                if (energy > maxEnergy) energy = maxEnergy;
+                updateUI();
+                saveUserData();
+            }
+        }, 60000 / rechargeRate);
+
+        // Show tab
+        function showTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+        }
+
+        // Load tickets
+        function loadTickets() {
+            const list = document.getElementById('tickets-list');
+            list.innerHTML = '';
+            tickets.forEach(ticket => {
+                const li = document.createElement('li');
+                li.innerText = `${ticket.name}: ${ticket.price} TON - ${ticket.desc} `;
+                const btn = document.createElement('button');
+                btn.innerText = boughtTickets[ticket.name] ? 'Bought' : 'Buy';
+                btn.disabled = !!boughtTickets[ticket.name];
+                btn.onclick = () => buyTicket(ticket.name, ticket.price, ticket.boost);
+                li.appendChild(btn);
+                list.appendChild(li);
+            });
+        }
+
+        // Buy ticket
+        async function buyTicket(name, price, boost) {
+            if (boughtTickets[name]) return alert('You already bought this ticket!');
+            if (confirm(`Are you sure you want to buy ${name} ticket for ${price} TON?`)) {
+                try {
+                    if (!tonConnector) await initTonConnect();
+                    const transaction = {
+                        validUntil: Math.floor(Date.now() / 1000) + 60,
+                        messages: [
+                            {
+                                address: wallet,
+                                amount: (price * 1e9).toString(),
+                                payload: 'Nexus Ticket: ' + name
+                            }
+                        ]
+                    };
+                    await tonConnector.sendTransaction(transaction);
+                    boughtTickets[name] = true;
+                    multiplier += boost - 1;
+                    alert(`Payment successful! ${name} ticket purchased. Boost applied.`);
+                    updateUI();
+                    loadTickets();
+                    saveUserData();
+                } catch (error) {
+                    alert('Payment error: ' + error.message);
+                }
+            }
+        }
+
+        // Init TonConnect
+        async function initTonConnect() {
+            tonConnector = new TonConnectSDK.TonConnect({
+                manifestUrl: 'https://your-site.com/tonconnect-manifest.json' // Replace
+            });
+            await tonConnector.restoreConnection();
+        }
+
+        // Complete task
+        function completeTask(taskId, reward) {
+            if (completedTasks[taskId]) return alert('This task is already completed!');
+            balance += reward;
+            completedTasks[taskId] = true;
+            alert(`Task completed! + ${reward} nexoshi`);
+            updateUI();
+            saveUserData();
+        }
+
+        // Claim daily
+        function claimDaily() {
+            const now = Date.now();
+            if (now - lastLogin > 86400000) {
+                dailyStreak = (now - lastLogin < 172800000) ? dailyStreak + 1 : 1;
+                lastLogin = now;
+                const reward = Math.min(1000 * dailyStreak, 5000);
+                balance += reward;
+                alert(`Daily claim! + ${reward} nexoshi. Streak: ${dailyStreak}`);
+                updateUI();
+                saveUserData();
+            } else {
+                alert('Claim later!');
+            }
+        }
+
+        // Connect wallet
+        async function connectWallet() {
+            if (!tonConnector) await initTonConnect();
+            await tonConnector.connectWallet();
+            completeTask('wallet', 2000);
+            saveUserData();
+        }
+
+        // Deposit 1 TON
+        async function depositOneTON() {
+            await buyTicket('Deposit1', 1, 0);
+            completeTask('deposit', 5000);
+            saveUserData();
+        }
+
+        // Apply boost
+        function applyBoost(type, cost, effect) {
+            if (balance < cost) return alert('Not enough nexoshi!');
+            balance -= cost;
+            effect();
+            alert(`${type} boost applied!`);
+            updateUI();
+            saveUserData();
+        }
+
+        // Auto mine
+        function startAutoMine() {
+            if (autoMineInterval) return;
+            autoMineInterval = setInterval(() => {
+                if (energy > 0) mine();
+            }, 5000);
+        }
+
+        function resetBoost() {
+            multiplier -= 0.5;
+            updateUI();
+            saveUserData();
+        }
+
+        // Referral system
+        function initReferral() {
+            const tg = Telegram.WebApp;
+            const refParam = new URLSearchParams(window.location.search).get('ref');
+            if (refParam && refParam !== userId && !referrals.includes(refParam)) {
+                referrals.push(refParam);
+                const count = referrals.length;
+                let reward = 0;
+                if (count === 1) reward = 2500;
+                else if (count === 3) reward = 10000;
+                else if (count === 5) reward = 25000;
+                else if (count === 10) reward = 50000;
+                else if (count === 20) reward = 100000;
+                else if (count === 30) reward = 150000;
+                else if (count === 40) reward = 200000;
+                else if (count === 50) reward = 250000;
+                else reward = 5000;
+                referralEarnings += reward;
+                balance += reward;
+                alert(`New referral! + ${reward} nexoshi`);
+                saveUserData();
+            }
+            const botUsername = 'YourBotUsername'; // Replace
+            document.getElementById('referral-link').innerText = `https://t.me/${botUsername}?start=ref_${userId}`;
+            updateUI();
+        }
+
+        // Offline gain
+        async function calculateOfflineGain() {
+            const userRef = db.ref('users/' + userId + '/lastExit');
+            const snapshot = await userRef.once('value');
+            const lastExit = snapshot.val() || Date.now();
+            const offlineTime = (Date.now() - lastExit) / 3600000;
+            const offlineGain = Math.min(profitHour * offlineTime, maxEnergy);
+            if (offlineGain > 0) {
+                balance += offlineGain;
+                alert(`Offline gain: + ${offlineGain.toFixed(0)} nexoshi`);
+                updateUI();
+                saveUserData();
+            }
+        }
+
+        // Initial
+        Telegram.WebApp.ready();
+        Telegram.WebApp.expand();
+        initUserData();
+    </script>
+</body>
+
+  </html>
